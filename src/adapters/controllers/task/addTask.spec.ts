@@ -1,34 +1,104 @@
-import {
-  DbAddTask,
-  MongoManager,
-  TaskMongoRepository,
-} from "../../../dataSources";
-import { addTaskValidationCompositeFactory } from "../../factories";
-import env from "../../presentations/api/config/env";
+import { describe, expect, jest, test } from "@jest/globals";
 import { AddTaskController } from "./addTask";
+import { AddTask, AddTaskModel } from "../../../usecases";
+import { Task } from "../../../entities/task";
+import { HttpRequest, Validation } from "../../interfaces";
+import { badRequest, serverError } from "../../presentations/api/httpResponses/httpResponses";
+import { MissingParamError } from "../../presentations/api/errors";
 
-describe("AddTask Controller", () => {
-  test("Deve chamar AddTask com valores corretos", async () => {
-    const httpRequest = {
-      body: {
+const makeAddTask = (): AddTask => {
+  class AddTaskStub implements AddTask {
+    async add(task: AddTaskModel): Promise<Task> {
+      return Promise.resolve({
+        id: "any_id",
         title: "any_title",
         description: "any_description",
         date: "30/06/2024",
-      },
-    };
-    await MongoManager.getInstance().connect(env.mongoUrl);
-    const taskMongoRepository = new TaskMongoRepository();
-    const dbAddTask = new DbAddTask(taskMongoRepository);
-    const addTaskController = new AddTaskController(
-      dbAddTask,
-      addTaskValidationCompositeFactory()
-    );
+      });
+    }
+  
+  } return new AddTaskStub();
+};
+const makeValidation = (): Validation => {
+  class ValidationStub implements Validation {
+    validate(input: any): void | Error {
+      return;
+    }
+  } return new ValidationStub();
+};
 
-    const httpResponse = await addTaskController.handle(httpRequest);
+interface SutTypes {
+  addTaskStub: AddTask;
+  validationStub: Validation;
+  sut: AddTaskController;
+}
 
-    expect(httpResponse.statusCode).toBe(201);
-    expect(httpResponse.body.title).toBe("any_title");
-    expect(httpResponse.body.description).toBe("any_description");
-    expect(httpResponse.body.date).toBe("30/06/2024");
+const makeSut = (): SutTypes => {
+  const addTaskStub = makeAddTask();
+  const validationStub = makeValidation();
+  const sut = new AddTaskController(
+    addTaskStub,
+    validationStub
+  );
+  return {
+    addTaskStub,
+    validationStub,
+    sut,
+  };
+};
+
+const makeFakeRequest = (): HttpRequest => {
+  return {
+    body: {
+      title: "any_title",
+      description: "any_description",
+      date: "30/06/2024",
+    },
+  };
+};
+
+describe("AddTask Controller", () => {
+  test("Deve chamar AddTask com valores corretos", async () => {
+    const { sut, addTaskStub } = makeSut();
+    const addSpy = jest.spyOn(addTaskStub, "add");
+
+    await sut.handle(makeFakeRequest());
+
+    expect(addSpy).toHaveBeenCalledWith({
+      title: "any_title",
+      description: "any_description",
+      date: "30/06/2024",
+    });
   });
+});
+
+describe("AddTask Controller", () => {
+  test("Deve retornar 500 se AddTask lançar uma exceção", async () => {
+    const { sut, addTaskStub } = makeSut();
+    jest.spyOn(addTaskStub, "add").mockImplementationOnce(async() => Promise.reject(new Error()));
+    const httpResponse = await sut.handle(makeFakeRequest());
+    expect(httpResponse).toEqual(serverError(new Error()));
+  });
+});
+
+test("Deve chamar Validation com valores corretos", async () => {
+  const { sut, validationStub } = makeSut();
+
+  const validateSpy = jest.spyOn(validationStub, "validate");
+  const httpRequest = makeFakeRequest();
+  await sut.handle(httpRequest);
+
+  expect(validateSpy).toHaveBeenCalledWith(httpRequest.body);
+});
+
+test("Should return 400 if an Validation returns an error", async () => {
+  const { sut, validationStub } = makeSut();
+
+  jest
+    .spyOn(validationStub, "validate")
+    .mockReturnValueOnce(new MissingParamError("any_field"));
+  const httpResponse = await sut.handle(makeFakeRequest());
+  expect(httpResponse).toEqual(
+    badRequest(new MissingParamError("any_field"))
+  );
 });
