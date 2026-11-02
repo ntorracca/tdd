@@ -13,7 +13,7 @@ import {
 } from "../../../adapters/presentations/api/errors";
 
 export class TaskMongoRepository
-  implements AddTaskRepository, DeleteTaskRepository
+implements AddTaskRepository, DeleteTaskRepository
 {
   async add(taskData: AddTaskModel): Promise<Task> {
     const taskCollection = MongoManager.getInstance().getCollection("tasks");
