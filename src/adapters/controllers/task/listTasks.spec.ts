@@ -1,5 +1,4 @@
-import { expect, jest } from "@jest/globals";
-import test, { describe } from "node:test";
+import { test, describe, expect, jest } from "@jest/globals";
 import { noContent, ok, serverError } from "../../presentations/api/httpResponses/httpResponses";
 import { ListTasksController } from "./listTasks";
 import { Task } from "../../../entities/task";
@@ -13,7 +12,7 @@ interface SutTypes {
 const makeListTasks = (): ListTasks => {
   class ListTasksStub implements ListTasks {
     async list(): Promise<Task[]> {
-      return Promise.resolve(makeFakeRequest());
+      return Promise.resolve(makeFakeTasks());
     } 
   }
   return new ListTasksStub();
@@ -25,7 +24,7 @@ const makeSut = (): SutTypes => {
   return { sut, listTaskStub: lisTaskStub };
 };
 
-const makeFakeRequest = (): Task[] => {
+const makeFakeTasks = (): Task[] => {
   return [
     {
       id: "any_id",
@@ -43,7 +42,7 @@ const makeFakeRequest = (): Task[] => {
 };
 
 describe("ListTasks Controller", () => {
-  test("Deve retornar 204 se alista estiver vazia", async () => {
+  test("Deve retornar 204 se a lista estiver vazia", async () => {
     const { sut, listTaskStub } = makeSut();
     jest.spyOn(listTaskStub, "list").mockReturnValueOnce(Promise.resolve([]));
     const httpResponse = await sut.handle({});
@@ -52,7 +51,7 @@ describe("ListTasks Controller", () => {
   test("Deve retornar 200 com uma lista de tarefas", async () => {
     const { sut } = makeSut();
     const httpResponse = await sut.handle({});
-    expect(httpResponse).toEqual(ok(makeFakeRequest()));
+    expect(httpResponse).toEqual(ok(makeFakeTasks()));
   });
 
   test("Deve verificar se a funcionalidade que lista tarefas é chamada corretamente", async () => {
